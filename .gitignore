@@ -1,0 +1,26 @@
+# Python & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Model Binaries & Caches (Do not commit gigabytes of model weights)
+models/*.gguf
+models/*.download
+models/.cache/
+.cache/
+hf_cache/
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log

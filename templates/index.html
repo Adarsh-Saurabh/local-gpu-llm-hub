@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal GPU LLM Hub & Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111726;
+      --card-border: #1e293b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(17, 24, 39, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: white;
+      font-size: 20px;
+    }
+    .brand-title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand-sub { font-size: 12px; color: var(--text-muted); }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.3); color: white; border-color: #ef4444; }
+    .btn-secondary { background: #1e293b; color: var(--text); border-color: #334155; }
+    .btn-secondary:hover { background: #334155; }
+    .btn-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
+    .btn-success:hover { background: rgba(16, 185, 129, 0.3); }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-active { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-idle { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
+    
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 24px;
+      flex: 1;
+    }
+    @media (max-width: 1100px) {
+      .container { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 24px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #e2e8f0;
+    }
+
+    /* Telemetry Bar */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .tele-stat {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #1e293b;
+      padding: 14px;
+      border-radius: 10px;
+    }
+    .tele-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .tele-val { font-size: 18px; font-weight: 700; color: #f8fafc; font-family: 'JetBrains Mono', monospace; }
+    
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #1e293b;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* Model items */
+    .model-list { display: flex; flex-direction: column; gap: 12px; }
+    .model-item {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid #1e293b;
+      padding: 16px 20px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    .model-item.active {
+      border-color: rgba(59, 130, 246, 0.6);
+      background: rgba(59, 130, 246, 0.08);
+    }
+    .model-info-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .model-info-meta { font-size: 12px; color: var(--text-muted); display: flex; gap: 12px; }
+    .model-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* Download Box */
+    .download-section {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px dashed #334155;
+      border-radius: 10px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    .preset-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .preset-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-chip:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); }
+    .input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .input-text {
+      flex: 1;
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .input-text:focus { border-color: var(--primary); }
+    .select-dropdown {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    /* Sliders */
+    .control-group { margin-bottom: 18px; }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    .control-label span { font-family: 'JetBrains Mono', monospace; color: var(--primary); font-weight: 600; }
+    input[type=range] {
+      width: 100%;
+      height: 6px;
+      border-radius: 4px;
+      background: #1e293b;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+    }
+
+    /* Playground */
+    .chat-box {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 220px;
+      max-height: 380px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      margin-bottom: 14px;
+    }
+    .chat-input-area { display: flex; gap: 10px; }
+    textarea {
+      flex: 1;
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 70px;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--primary); }
+
+    /* Guides Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active { background: #1e293b; color: #38bdf8; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .code-block {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #e2e8f0;
+      position: relative;
+      overflow-x: auto;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #334155; }
+    .guide-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .guide-table th, .guide-table td {
+      border: 1px solid #1e293b;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .guide-table th { background: #0f172a; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Universal GPU LLM Hub</div>
+        <div class="brand-sub" id="headerDeviceSub">Auto-Detecting Hardware...</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="statusBadge" class="badge badge-idle">Checking Status...</div>
+      <button class="btn btn-danger" onclick="unloadVRAM()">🧹 Free Memory</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Left Main Column -->
+    <main>
+      <!-- Telemetry Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>Hardware & GPU Telemetry</span>
+          <span style="font-size: 12px; color: var(--text-muted);" id="lastUpdated">Updated just now</span>
+        </div>
+        <div class="telemetry-grid">
+          <div class="tele-stat">
+            <div class="tele-label">VRAM / GPU Memory</div>
+            <div class="tele-val" id="vramText">-- / -- MB</div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="vramBar"></div>
+            </div>
+          </div>
+          <div class="tele-stat">
+            <div class="tele-label">GPU Temperature</div>
+            <div class="tele-val" id="gpuTemp">-- °C</div>
+          </div>
+          <div class="tele-stat">
+            <div class="tele-label">GPU Utilization</div>
+            <div class="tele-val" id="gpuUtil">-- %</div>
+          </div>
+          <div class="tele-stat">
+            <div class="tele-label">Active Model</div>
+            <div class="tele-val" style="font-size: 13px; word-break: break-all;" id="activeModelName">None</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Downloaded Models & Downloader Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>Model Management</span>
+          <button class="btn btn-secondary btn-sm" onclick="fetchStatus()">🔄 Refresh</button>
+        </div>
+
+        <div class="model-list" id="modelsList">
+          <div style="color: var(--text-muted); font-size: 13px;">Scanning models directory...</div>
+        </div>
+
+        <!-- Download New Model from HF Section -->
+        <div class="download-section">
+          <div style="font-weight: 600; font-size: 13px; margin-bottom: 10px;">📥 Download Model from Hugging Face</div>
+          
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Hardware Tier Recommendations:</div>
+          <div class="preset-chips" id="recommendedPresetChips">
+            <div class="preset-chip" onclick="setPreset('bartowski/mistral-small-24b-instruct-2501-GGUF', 'mistral-small-24b-instruct-2501-Q3_K_M.gguf', '11.23 GB')">🚀 Mistral-Small 24B (11.23 GB)</div>
+            <div class="preset-chip" onclick="setPreset('bartowski/Codestral-22B-v0.1-GGUF', 'Codestral-22B-v0.1-Q3_K_M.gguf', '10.64 GB')">💻 Codestral 22B (10.64 GB)</div>
+            <div class="preset-chip" onclick="setPreset('bartowski/Qwen2.5-Coder-14B-Instruct-GGUF', 'Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf', '8.99 GB')">⚡ Qwen2.5-Coder 14B (8.99 GB)</div>
+            <div class="preset-chip" onclick="setPreset('bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF', 'DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf', '8.37 GB')">🧠 DeepSeek-R1 14B (8.37 GB)</div>
+          </div>
+
+          <div class="input-row">
+            <input type="text" id="hfRepoInput" class="input-text" placeholder="Hugging Face Repo (e.g. bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF)">
+            <button class="btn btn-secondary btn-sm" onclick="searchHfRepo()">Find .gguf Files</button>
+          </div>
+
+          <select id="hfFileSelect" class="select-dropdown" style="display: none;">
+            <option value="">Select a .gguf quantization file...</option>
+          </select>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <button class="btn btn-primary" id="downloadBtn" onclick="startDownload()">Download & Add Model</button>
+            <div id="downloadStatusText" style="font-size: 12px; color: #38bdf8;"></div>
+          </div>
+          
+          <div id="downloadProgressContainer" class="progress-bar-container" style="display: none; margin-top: 12px;">
+            <div id="downloadProgressBar" class="progress-bar-fill" style="width: 0%; background: #3b82f6;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Playground Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>Live Code Playground</span>
+          <button class="btn btn-secondary btn-sm" onclick="clearPlayground()">Clear</button>
+        </div>
+        <div class="chat-box" id="playgroundOutput">Output will stream here in real-time...</div>
+        <div class="chat-input-area">
+          <textarea id="promptInput" placeholder="Type a coding prompt (e.g. 'Write a Python FastAPI websocket endpoint with type hints')..."></textarea>
+          <button class="btn btn-primary" id="generateBtn" onclick="runInference()" style="padding: 0 24px;">Generate</button>
+        </div>
+      </div>
+
+      <!-- Integration Guides Card (Dynamic URLs) -->
+      <div class="card">
+        <div class="card-title">📚 Connection & Integration Guides</div>
+        
+        <div class="tabs-nav">
+          <button class="tab-btn active" onclick="switchTab('tab-sillytavern')">SillyTavern</button>
+          <button class="tab-btn" onclick="switchTab('tab-vscode')">VS Code (Continue)</button>
+          <button class="tab-btn" onclick="switchTab('tab-cline')">Cline / Roo Code</button>
+          <button class="tab-btn" onclick="switchTab('tab-claude')">Claude Code CLI</button>
+          <button class="tab-btn" onclick="switchTab('tab-curl')">cURL / Python API</button>
+          <button class="tab-btn" onclick="switchTab('tab-aider')">Aider CLI</button>
+        </div>
+
+        <!-- SillyTavern Tab -->
+        <div id="tab-sillytavern" class="tab-content active">
+          <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 10px;">In SillyTavern, click the top <strong>API Connections</strong> icon (plug 🔌) and configure:</p>
+          <table class="guide-table">
+            <tr><th>Setting</th><th>Value</th></tr>
+            <tr><td><strong>API</strong></td><td><code>Chat Completion</code></td></tr>
+            <tr><td><strong>Chat Completion Source</strong></td><td><code>Custom (OpenAI-compatible)</code></td></tr>
+            <tr><td><strong>Custom Endpoint (Base URL)</strong></td><td><code id="guide-st-url">http://.../v1</code></td></tr>
+            <tr><td><strong>API Key</strong></td><td><code>none</code></td></tr>
+          </table>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">Click <strong>Connect</strong> (or refresh 🔄), select the model, and chat!</p>
+        </div>
+
+        <!-- VS Code Continue Tab -->
+        <div id="tab-vscode" class="tab-content">
+          <p style="font-size: 13px; color: #cbd5e1;">In VS Code, open <code>~/.continue/config.json</code> and paste:</p>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copySnippet(document.getElementById('code-continue').innerText)">Copy</button>
+            <pre id="code-continue"></pre>
+          </div>
+        </div>
+
+        <!-- Cline / Roo Code Tab -->
+        <div id="tab-cline" class="tab-content">
+          <p style="font-size: 13px; color: #cbd5e1;">In Cline / Roo Code extension settings:</p>
+          <table class="guide-table">
+            <tr><th>Setting</th><th>Value</th></tr>
+            <tr><td><strong>API Provider</strong></td><td><code>OpenAI-Compatible</code></td></tr>
+            <tr><td><strong>Base URL</strong></td><td><code id="guide-cline-url">http://.../v1</code></td></tr>
+            <tr><td><strong>API Key</strong></td><td><code>none</code></td></tr>
+            <tr><td><strong>Model ID</strong></td><td><code>default</code> (or exact model name)</td></tr>
+          </table>
+        </div>
+
+        <!-- Claude Code CLI Tab -->
+        <div id="tab-claude" class="tab-content">
+          <p style="font-size: 13px; color: #cbd5e1;">On your client terminal, run:</p>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copySnippet(document.getElementById('code-claude').innerText)">Copy</button>
+            <pre id="code-claude"></pre>
+          </div>
+        </div>
+
+        <!-- cURL / Python Tab -->
+        <div id="tab-curl" class="tab-content">
+          <p style="font-size: 13px; color: #cbd5e1;">Test with cURL or Python OpenAI SDK:</p>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copySnippet(document.getElementById('code-curl').innerText)">Copy</button>
+            <pre id="code-curl"></pre>
+          </div>
+        </div>
+
+        <!-- Aider CLI Tab -->
+        <div id="tab-aider" class="tab-content">
+          <p style="font-size: 13px; color: #cbd5e1;">Connect with Aider CLI from terminal:</p>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copySnippet(document.getElementById('code-aider').innerText)">Copy</button>
+            <pre id="code-aider"></pre>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Sidebar Controls -->
+    <aside>
+      <!-- Sliders Card -->
+      <div class="card">
+        <div class="card-title">Inference & Memory Controls</div>
+        
+        <!-- N GPU Layers Slider -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>GPU Offload Layers</span>
+            <span id="gpuLayersVal">Full GPU (-1)</span>
+          </div>
+          <input type="range" id="gpuLayersSlider" min="-1" max="64" step="1" value="-1" oninput="updateControls()">
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">-1 = 100% GPU VRAM | 0 = CPU only | 1..64 = Partial offload</div>
+        </div>
+
+        <!-- Context Window Slider -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>Context Window</span>
+            <span id="ctxVal">16,384 tokens</span>
+          </div>
+          <input type="range" id="ctxSlider" min="2048" max="32768" step="2048" value="16384" oninput="updateControls()">
+        </div>
+
+        <!-- Temperature Slider -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>Temperature</span>
+            <span id="tempVal">0.60</span>
+          </div>
+          <input type="range" id="tempSlider" min="0.0" max="1.5" step="0.05" value="0.60" oninput="updateControls()">
+        </div>
+
+        <!-- Max Tokens Slider -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>Max Response Tokens</span>
+            <span id="maxTokensVal">2,048 tokens</span>
+          </div>
+          <input type="range" id="maxTokensSlider" min="256" max="4096" step="256" value="2048" oninput="updateControls()">
+        </div>
+
+        <!-- Idle Auto-Unload Slider -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>Idle Auto-Unload</span>
+            <span id="idleVal">30 minutes</span>
+          </div>
+          <input type="range" id="idleSlider" min="0" max="60" step="5" value="30" oninput="updateControls()">
+        </div>
+      </div>
+
+      <!-- Server Quick Info -->
+      <div class="card">
+        <div class="card-title">Live Endpoints</div>
+        <div style="font-size: 12px; line-height: 1.8; color: #cbd5e1;">
+          <div>🌐 <strong>Web Dashboard:</strong> <code id="info-dash">http://.../</code></div>
+          <div>🔌 <strong>OpenAI API:</strong> <code id="info-api">http://.../v1</code></div>
+          <div>🤖 <strong>Claude Code:</strong> <code id="info-claude">http://...</code></div>
+          <div>🧹 <strong>Quick Unload:</strong> <code id="info-unload">http://.../unload</code></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    let serverState = {};
+    let isDownloading = false;
+
+    function getBaseUrl() {
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+
+    function populateDynamicGuides() {
+      const base = getBaseUrl();
+      const apiV1 = `${base}/v1`;
+
+      document.getElementById('guide-st-url').innerText = apiV1;
+      document.getElementById('guide-cline-url').innerText = apiV1;
+      document.getElementById('info-dash').innerText = `${base}/`;
+      document.getElementById('info-api').innerText = apiV1;
+      document.getElementById('info-claude').innerText = base;
+      document.getElementById('info-unload').innerText = `${base}/unload`;
+
+      // VS Code Continue
+      document.getElementById('code-continue').innerText = JSON.stringify({
+        "models": [
+          {
+            "title": "Local GPU Hub",
+            "provider": "openai",
+            "model": "default",
+            "apiBase": apiV1,
+            "apiKey": "none"
+          }
+        ]
+      }, null, 2);
+
+      // Claude Code
+      document.getElementById('code-claude').innerText = 
+`# Windows (PowerShell):
+$env:ANTHROPIC_BASE_URL = "${base}"
+$env:ANTHROPIC_API_KEY = "sk-local"
+claude
+
+# macOS / Linux (Bash):
+export ANTHROPIC_BASE_URL="${base}"
+export ANTHROPIC_API_KEY="sk-local"
+claude`;
+
+      // cURL & Python
+      document.getElementById('code-curl').innerText = 
+`# cURL
+curl ${apiV1}/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{"messages": [{"role": "user", "content": "Write a python hello world"}], "max_tokens": 100}'
+
+# Python
+from openai import OpenAI
+client = OpenAI(base_url="${apiV1}", api_key="none")
+resp = client.chat.completions.create(
+    model="default",
+    messages=[{"role": "user", "content": "Write a python hello world"}]
+)
+print(resp.choices[0].message.content)`;
+
+      // Aider
+      document.getElementById('code-aider').innerText = 
+`aider --openai-api-base ${apiV1} --openai-api-key none --model openai/default`;
+    }
+
+    function updateControls() {
+      const layers = parseInt(document.getElementById('gpuLayersSlider').value);
+      if (layers === -1) {
+        document.getElementById('gpuLayersVal').innerText = "Full GPU (-1)";
+      } else if (layers === 0) {
+        document.getElementById('gpuLayersVal').innerText = "CPU Only (0)";
+      } else {
+        document.getElementById('gpuLayersVal').innerText = `${layers} Layers on GPU`;
+      }
+
+      document.getElementById('ctxVal').innerText = Number(document.getElementById('ctxSlider').value).toLocaleString() + " tokens";
+      document.getElementById('tempVal').innerText = Number(document.getElementById('tempSlider').value).toFixed(2);
+      document.getElementById('maxTokensVal').innerText = Number(document.getElementById('maxTokensSlider').value).toLocaleString() + " tokens";
+      const idle = Number(document.getElementById('idleSlider').value);
+      document.getElementById('idleVal').innerText = idle === 0 ? "Disabled (Never)" : idle + " minutes";
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        serverState = data;
+
+        // Device Subtitle
+        if (data.hardware) {
+          document.getElementById('headerDeviceSub').innerText = 
+            `${data.hardware.device_name} [${data.hardware.device_type.toUpperCase()}] • Stateless Server`;
+        }
+
+        // Telemetry
+        const used = data.gpu.memory_used_mb || 0;
+        const total = data.gpu.memory_total_mb || 16384;
+        const pct = Math.round((used / total) * 100);
+        document.getElementById('vramText').innerText = `${used} / ${total} MB (${pct}%)`;
+        document.getElementById('vramBar').style.width = `${pct}%`;
+        document.getElementById('gpuTemp').innerText = `${data.gpu.temperature_c || '--'} °C`;
+        document.getElementById('gpuUtil').innerText = `${data.gpu.utilization_pct || '0'} %`;
+        
+        // Active model badge
+        const badge = document.getElementById('statusBadge');
+        if (data.active_model) {
+          const layersStr = data.active_gpu_layers === -1 ? 'Full GPU' : (data.active_gpu_layers === 0 ? 'CPU' : `${data.active_gpu_layers}L`);
+          badge.className = 'badge badge-active';
+          badge.innerText = `🟢 ${data.active_model} (${layersStr})`;
+          document.getElementById('activeModelName').innerText = `${data.active_model} [${layersStr}]`;
+        } else {
+          badge.className = 'badge badge-idle';
+          badge.innerText = '⚪ Idle (Memory Free)';
+          document.getElementById('activeModelName').innerText = 'None (Memory Free)';
+        }
+
+        // Render Models List
+        const listEl = document.getElementById('modelsList');
+        if (!data.downloaded_models || data.downloaded_models.length === 0) {
+          listEl.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">No .gguf models found in ./models folder. Download one below!</div>';
+        } else {
+          listEl.innerHTML = data.downloaded_models.map(m => `
+            <div class="model-item ${m.is_loaded ? 'active' : ''}">
+              <div>
+                <div class="model-info-name">${m.name}</div>
+                <div class="model-info-meta">
+                  <span>💾 ${m.size_gb}</span>
+                  <span>${m.is_loaded ? '🟢 Active in Memory' : '⚪ Standby'}</span>
+                </div>
+              </div>
+              <div class="model-actions">
+                ${m.is_loaded 
+                  ? '<button class="btn btn-danger btn-sm" onclick="unloadVRAM()">Unload</button>'
+                  : `<button class="btn btn-primary btn-sm" onclick="loadModel('${m.name}')">⚡ Load to GPU</button>`
+                }
+                <button class="btn btn-danger btn-sm" title="Delete model from disk" onclick="deleteModel('${m.name}')">🗑️ Delete</button>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Real-time Download Telemetry
+        if (data.download_task && data.download_task.status === 'downloading') {
+          isDownloading = true;
+          document.getElementById('downloadProgressContainer').style.display = 'block';
+          document.getElementById('downloadProgressBar').style.width = `${data.download_task.percent || 0}%`;
+          document.getElementById('downloadStatusText').innerText = 
+            `⏳ ${data.download_task.downloaded_gb || 0} / ${data.download_task.total_gb || 0} GB (${data.download_task.percent || 0}%) • ${data.download_task.speed_mb || 0} MB/s • ${data.download_task.eta || 'Calculating...'}`;
+          document.getElementById('downloadBtn').disabled = true;
+        } else if (data.download_task && data.download_task.status === 'completed') {
+          if (isDownloading) {
+            isDownloading = false;
+            document.getElementById('downloadProgressBar').style.width = `100%`;
+            document.getElementById('downloadStatusText').innerText = `✅ ${data.download_task.message}`;
+            document.getElementById('downloadBtn').disabled = false;
+            setTimeout(() => { document.getElementById('downloadProgressContainer').style.display = 'none'; }, 6000);
+          }
+        } else if (data.download_task && data.download_task.status === 'error') {
+          isDownloading = false;
+          document.getElementById('downloadProgressContainer').style.display = 'none';
+          document.getElementById('downloadStatusText').innerText = `❌ Error: ${data.download_task.message}`;
+          document.getElementById('downloadBtn').disabled = false;
+        }
+
+        document.getElementById('lastUpdated').innerText = new Date().toLocaleTimeString();
+      } catch (err) {
+        console.error("Failed to fetch status:", err);
+      }
+    }
+
+    async function loadModel(name) {
+      const ctx = document.getElementById('ctxSlider').value;
+      const layers = document.getElementById('gpuLayersSlider').value;
+      try {
+        await fetch(`/load?model=${encodeURIComponent(name)}&ctx=${ctx}&gpu_layers=${layers}`);
+        await fetchStatus();
+      } catch (err) {
+        alert("Failed to load model: " + err);
+      }
+    }
+
+    async function unloadVRAM() {
+      try {
+        await fetch('/unload');
+        await fetchStatus();
+      } catch (err) {
+        alert("Failed to unload VRAM: " + err);
+      }
+    }
+
+    async function deleteModel(name) {
+      if (!confirm(`Are you sure you want to delete '${name}' from disk to free storage space?`)) return;
+      try {
+        const res = await fetch('/api/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name })
+        });
+        const data = await res.json();
+        alert(data.message || "Model deleted.");
+        fetchStatus();
+      } catch (err) {
+        alert("Failed to delete model: " + err);
+      }
+    }
+
+    function setPreset(repo, filename, sizeGb) {
+      document.getElementById('hfRepoInput').value = repo;
+      const select = document.getElementById('hfFileSelect');
+      select.style.display = 'block';
+      const label = sizeGb ? `${filename} (${sizeGb})` : filename;
+      select.innerHTML = `<option value="${filename}" selected>${label}</option>`;
+    }
+
+    async function searchHfRepo() {
+      const repo = document.getElementById('hfRepoInput').value.trim();
+      if (!repo) { alert("Please enter a Hugging Face repo ID"); return; }
+      
+      const select = document.getElementById('hfFileSelect');
+      select.style.display = 'block';
+      select.innerHTML = '<option value="">Searching for .gguf files on Hugging Face...</option>';
+
+      try {
+        const res = await fetch(`/api/hf-files?repo_id=${encodeURIComponent(repo)}`);
+        const data = await res.json();
+        if (data.files && data.files.length > 0) {
+          select.innerHTML = '<option value="">Select a .gguf quantization file...</option>' + 
+            data.files.map(f => `<option value="${f.filename}">${f.filename} — [ ${f.size_gb} ]</option>`).join('');
+        } else {
+          select.innerHTML = '<option value="">No .gguf files found in this repo.</option>';
+        }
+      } catch (err) {
+        select.innerHTML = '<option value="">Error searching repo.</option>';
+      }
+    }
+
+    async function startDownload() {
+      const repo = document.getElementById('hfRepoInput').value.trim();
+      const select = document.getElementById('hfFileSelect');
+      const filename = select.value.trim();
+
+      if (!repo || !filename) {
+        alert("Please specify both the Hugging Face repo and select a .gguf filename.");
+        return;
+      }
+
+      document.getElementById('downloadBtn').disabled = true;
+      document.getElementById('downloadProgressContainer').style.display = 'block';
+      document.getElementById('downloadStatusText').innerText = `Starting download for ${filename}...`;
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo_id: repo, filename: filename })
+        });
+        const data = await res.json();
+        isDownloading = true;
+        fetchStatus();
+      } catch (err) {
+        alert("Failed to start download: " + err);
+        document.getElementById('downloadBtn').disabled = false;
+      }
+    }
+
+    async function runInference() {
+      const prompt = document.getElementById('promptInput').value.trim();
+      if (!prompt) return;
+
+      const outputBox = document.getElementById('playgroundOutput');
+      const genBtn = document.getElementById('generateBtn');
+      outputBox.innerText = "Thinking and generating...\n";
+      genBtn.disabled = true;
+
+      const temp = parseFloat(document.getElementById('tempSlider').value);
+      const maxTokens = parseInt(document.getElementById('maxTokensSlider').value);
+      const layers = parseInt(document.getElementById('gpuLayersSlider').value);
+
+      try {
+        const response = await fetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }],
+            temperature: temp,
+            max_tokens: maxTokens,
+            gpu_layers: layers,
+            stream: true
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        outputBox.innerText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const parsed = JSON.parse(line.substring(6));
+                const text = parsed.choices[0]?.delta?.content || '';
+                outputBox.innerText += text;
+                outputBox.scrollTop = outputBox.scrollHeight;
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (err) {
+        outputBox.innerText += "\n[Error: " + err + "]";
+      } finally {
+        genBtn.disabled = false;
+        fetchStatus();
+      }
+    }
+
+    function clearPlayground() {
+      document.getElementById('playgroundOutput').innerText = "Output will stream here in real-time...";
+      document.getElementById('promptInput').value = "";
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function copySnippet(text) {
+      navigator.clipboard.writeText(text);
+      alert("Copied to clipboard!");
+    }
+
+    populateDynamicGuides();
+    setInterval(fetchStatus, 3000);
+    fetchStatus();
+    updateControls();
+  </script>
+</body>
+</html>
