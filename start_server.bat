@@ -15,5 +15,12 @@ echo.
 echo Opening Web Dashboard in your browser...
 start http://localhost:11434/
 echo.
+
+:server_loop
+echo [%date% %time%] Launching LLM Server Watchdog...
 python server.py --host 0.0.0.0 --port 11434
-pause
+echo.
+echo [WATCHDOG] Server stopped. Automatically restarting in 3 seconds...
+echo (Press Ctrl+C to permanently close)
+timeout /t 3 /nobreak >nul
+goto server_loop
